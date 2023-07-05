@@ -1,0 +1,26 @@
+[package]
+name = "dotfilr"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kyle Cook <kylecook80@gmail.com>"]
+description = ""
+license = "MIT"
+
+[package.metadata.deb]
+maintainer = "Kyle Cook <kylecook80@gmail.com>"
+copyright = "2023, Kyle Cook"
+assets = [
+    ["target/release/dotfilr", "usr/bin/", "755"],
+]
+
+[dependencies]
+anyhow = "1.0.71"
+clap = { version = "4.3.9", features = ["derive"] }
+git2 = "0.17.2"
+home = "0.5.5"
+reqwest = "0.11.18"
+serde = { version = "1.0.166", features = ["derive"] }
+ssh2 = "0.9.4"
+thiserror = "1.0.40"
+tokio = { version = "1.28.2", features = ["full"] }
+toml = "0.7.5"
