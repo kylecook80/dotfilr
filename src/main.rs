@@ -3,7 +3,8 @@ mod directories;
 mod error;
 
 use crate::config::Config;
-use crate::directories::HomeDir;
+use crate::directories::ManagedDirectory;
+use crate::error::Error;
 
 use std::fs::{DirBuilder, read_dir, remove_file};
 use std::os::unix::fs::symlink;
@@ -99,15 +100,15 @@ async fn main() -> Result<()> {
     let config = config.unwrap();
 
     // Home directory path
-    let home_dir = HomeDir::new();
+    let mut home_dir = ManagedDirectory::new(home::home_dir().unwrap());
 
     // Ensure main config directory is created
-    let dotfilr_path = make_config_dir(".")?;
+    let mut dotfilr_dir = ManagedDirectory::new(home_dir.get_path().to_path_buf());
 
     // Match commands
     match cli.command {
         Commands::Install(args) => {
-            let repos_path = make_config_dir("repos")?;
+            dotfilr_dir.subdir(String::from("repos"));
             
             if args.git.is_some() && args.path.is_some() {
                 return Err(anyhow!("Error: Can only use one of --git or --path."));
@@ -120,19 +121,25 @@ async fn main() -> Result<()> {
             }
 
             if let Some(p) = args.path {
-                // Create bin directory if it doesn't already exist
-                let home_bin = make_home_dir("bin")?;
+                if !Path::exists(&p) {
+                    return Err(anyhow!("Error. Path does not exist: {}", p.to_str().unwrap()));
+                }
 
-                // Install bin files
-                let bin_path = p.join("bin");
-                for item in read_dir(bin_path)? {
+                let mut dotfiles_dir = ManagedDirectory::new(p);
+
+                dotfiles_dir.install_to(home_dir.get_path());
+
+                let path_files_dir = dotfiles_dir.subdir(String::from("files"));
+                let mut home_files_dir = home_dir.subdir(String::from("files"));
+
+                for item in path_files_dir.iter() {
                     let entry = item?;
-                    let dest = home_bin.join(entry.file_name());
 
-                    if Path::exists(&dest) {
-                        println!("Skipping {}", dest.as_os_str().to_str().unwrap());    
+                    let dest = home_files_dir.link(&entry.path());
+                    if let Err(Error::FileExists) = dest {
+                        println!("File exists. Skipping {}", entry.file_name().to_str().unwrap());
                     } else {
-                        symlink(entry.path(), dest)?;
+                        println!("Linking new file {}", entry.file_name().to_str().unwrap());
                     }
                 }
             }
@@ -142,6 +149,7 @@ async fn main() -> Result<()> {
             for item in read_dir(home_bin)? {
                 let entry = item?;
                 if entry.metadata()?.is_symlink() {
+                    println!("Removing file {}", entry.file_name().to_str().unwrap());
                     remove_file(entry.path())?;
                 }
             }

@@ -14,4 +14,7 @@ pub enum Error {
 
     #[error("could not parse config file: {0}")]
     ConfigParse(#[from] toml::de::Error),
+
+    #[error("file already exists")]
+    FileExists,
 }
